@@ -30,12 +30,28 @@ from filterpy.kalman import KalmanFilter
 np.random.seed(0)
 
 
+# this function will solve the linear assignment problem, depending on the availability of 
+# certain Python packages. The linear assignment problem is a combinatorial optimization problem
+# which seeks to find the optimal assignment of a set of agents to a set of tasks, such that
+# the total cost or benefit of the assignment is minimized or maximized
 def linear_assignment(cost_matrix):
     try:
-        import lap
-        _, x, y = lap.lapjv(cost_matrix, extend_cost=True)
-        return np.array([[y[i], i] for i in x if i >= 0])  #
+        import lap # will try to import the lap module, which provides an efficient implementation of the
+                   # Jonker-Volgenant algorithm for solving the linear assignment problem. 
+        _, x, y = lap.lapjv(cost_matrix, extend_cost=True) 
+                # if the lap module is available, the function calls the `lapjv` function to solve the problem
+                # which takes a cost matrix as input, which is a 2D array of shape (n_agents, n_tasks)
+                # the extend_cost = TRUE argument tells the function to extend the cost matrix with additional
+                # rows or columns of zeros to ensure that there are an equal number of agents and tasks
+                # the `lapjv` function returns a tuple of three arrays: the optimal assignment indices `x`,
+                # the optimal assignment indices `y` for the tasks, and the corresponding optimal cost, and 
+                # the corresponding optimal cost
+        return np.array([[y[i], i] for i in x if i >= 0])  
+                # the function will then return an array of shape (n_agents, 2) using a list 
+                # comprehension and the np.array function  
     except ImportError:
+        # if the lap module is not available, the function falls back to using the `linear_sum_assignnment`
+        # function from the `scipy.optimize`
         from scipy.optimize import linear_sum_assignment
         x, y = linear_sum_assignment(cost_matrix)
         return np.array(list(zip(x, y)))
