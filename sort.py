@@ -56,24 +56,34 @@ def linear_assignment(cost_matrix):
         x, y = linear_sum_assignment(cost_matrix)
         return np.array(list(zip(x, y)))
 
-
+# this function takes two arrays, `bb_test` and `bb_gt` contatining bounding boxes 
+# in the form [x1,y1,x2,y2] and computes the Intersection over Union (IoU) between them
+# purpose of the IOU is to determine whether a detected bounding box should be associated
+# with an existing object or should be considered a new object
 def iou_batch(bb_test, bb_gt):
     """
   From SORT: Computes IOU between two bboxes in the form [x1,y1,x2,y2]
   """
+    #  we expand the dimensions of `bb_test`, `bb_gt` using `np.expand_dims` so that
+    # they can be broadcast together in the subsequent operations
     bb_gt = np.expand_dims(bb_gt, 0)
     bb_test = np.expand_dims(bb_test, 1)
 
+    # compute the coordinates of the intersection between the two bounding boxes `np.maximum` and `np.minimum`
     xx1 = np.maximum(bb_test[..., 0], bb_gt[..., 0])
     yy1 = np.maximum(bb_test[..., 1], bb_gt[..., 1])
     xx2 = np.minimum(bb_test[..., 2], bb_gt[..., 2])
     yy2 = np.minimum(bb_test[..., 3], bb_gt[..., 3])
+    
+   # calculate the width and height of the intersection
     w = np.maximum(0., xx2 - xx1)
     h = np.maximum(0., yy2 - yy1)
     wh = w * h
+    # calculates IOU as the ratio of the intersection area to the union area
     o = wh / ((bb_test[..., 2] - bb_test[..., 0]) * (bb_test[..., 3] - bb_test[..., 1])
               + (bb_gt[..., 2] - bb_gt[..., 0]) * (bb_gt[..., 3] - bb_gt[..., 1]) - wh)
-    return (o)
+    # return the IOU
+    return (o) 
 
 
 def convert_bbox_to_z(bbox):
@@ -82,13 +92,13 @@ def convert_bbox_to_z(bbox):
     [x,y,s,r] where x,y is the centre of the box and s is the scale/area and r is
     the aspect ratio
   """
-    w = bbox[2] - bbox[0]
-    h = bbox[3] - bbox[1]
-    x = bbox[0] + w / 2.
-    y = bbox[1] + h / 2.
+    w = bbox[2] - bbox[0] # width of box
+    h = bbox[3] - bbox[1] # height of the box
+    x = bbox[0] + w / 2. # x coordinate of the center
+    y = bbox[1] + h / 2. # y coordinate of the center
     s = w * h  # scale is just area
-    r = w / float(h)
-    return np.array([x, y, s, r]).reshape((4, 1))
+    r = w / float(h) # aspect ratio
+    return np.array([x, y, s, r]).reshape((4, 1)) # return the new vector [x,y,s,r]
 
 
 def convert_x_to_bbox(x, score=None):
@@ -96,14 +106,15 @@ def convert_x_to_bbox(x, score=None):
   Takes a bounding box in the centre form [x,y,s,r] and returns it in the form
     [x1,y1,x2,y2] where x1,y1 is the top left and x2,y2 is the bottom right
   """
-    w = np.sqrt(x[2] * x[3])
-    h = x[2] / w
-    if (score == None):
+    w = np.sqrt(x[2] * x[3]) # width
+    h = x[2] / w # height
+    if (score == None): # if no score, returns [x1,y1,x2,y2] as vector shape (1,4)
         return np.array([x[0] - w / 2., x[1] - h / 2., x[0] + w / 2., x[1] + h / 2.]).reshape((1, 4))
-    else:
+    else: # if score is not none, returns [x1,y1,x2,y2] as vector shape (1,5)
         return np.array([x[0] - w / 2., x[1] - h / 2., x[0] + w / 2., x[1] + h / 2., score]).reshape((1, 5))
 
 
+# Kalman filter based object tracker with the ability to track objects using bounding boxes
 class KalmanBoxTracker(object):
     """
   This class represents the internal state of individual tracked objects observed as bbox.
@@ -115,7 +126,7 @@ class KalmanBoxTracker(object):
     Initialises a tracker using initial bounding box.
     """
         # define constant velocity model
-        self.kf = KalmanFilter(dim_x=7, dim_z=4)
+        self.kf = KalmanFilter(dim_x=7, dim_z=4) # kf = Kalman Filter object
         self.kf.F = np.array(
             [[1, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0, 1], [0, 0, 0, 1, 0, 0, 0],
              [0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 0, 1]])
@@ -129,13 +140,13 @@ class KalmanBoxTracker(object):
         self.kf.Q[4:, 4:] *= 0.01
 
         self.kf.x[:4] = convert_bbox_to_z(bbox)
-        self.time_since_update = 0
+        self.time_since_update = 0 # time since the last update
         self.id = KalmanBoxTracker.count
         KalmanBoxTracker.count += 1
-        self.history = []
-        self.hits = 0
-        self.hit_streak = 0
-        self.age = 0
+        self.history = [] # history of past bounding boxes
+        self.hits = 0 # number of hits the tracker has had
+        self.hit_streak = 0 # length of the current hit streak
+        self.age = 0 # age of the tracker
 
     def update(self, bbox):
         """
@@ -168,18 +179,25 @@ class KalmanBoxTracker(object):
         return convert_x_to_bbox(self.kf.x)
 
 
-def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
+# function to take in a list of detections and a list of trackers, both represented as bounding boxes, and assigns each detection
+# to a tracker based on the intersection over union (IoU) between the two. It will then return 3 lists: matches, unmathed detections, and unmatched trackers
+def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3): # IOU threshold = detection will only be assigned to a tracker if the IOU > .3
     """
   Assigns detections to tracked object (both represented as bounding boxes)
   Returns 3 lists of matches, unmatched_detections and unmatched_trackers
   """
+    # if no trackers, return an empty array for matches, all the detections as unmatched_detections, and an empty artray for unmatched_trackers
     if (len(trackers) == 0):
         return np.empty((0, 2), dtype=int), np.arange(len(detections)), np.empty((0, 5), dtype=int)
 
-    iou_matrix = iou_batch(detections, trackers)
+    # IOU matrix is computed using the iou_batch function 
+    iou_matrix = iou_batch(detections, trackers) 
 
+    # if matrix is not empty, checks if there is only one detection and one tracker, and if they have an IOU greater than the threshold
+    # if the IOU is greater than the threshold, we will assign them a match, otherwise, we will use the linear_assignment function
+    # to fuind the best matches between detections and trackers
     if min(iou_matrix.shape) > 0:
-        a = (iou_matrix > iou_threshold).astype(np.int32)
+        a = (iou_matrix > iou_threshold).astype(np.int32) 
         if a.sum(1).max() == 1 and a.sum(0).max() == 1:
             matched_indices = np.stack(np.where(a), axis=1)
         else:
@@ -187,6 +205,7 @@ def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
     else:
         matched_indices = np.empty(shape=(0, 2))
 
+    # after getting the matched_indices, we add the unmatched detections and trackers to their respective lists
     unmatched_detections = []
     for d, det in enumerate(detections):
         if (d not in matched_indices[:, 0]):
@@ -209,20 +228,24 @@ def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
     else:
         matches = np.concatenate(matches, axis=0)
 
+    # return 3 lists
     return matches, np.array(unmatched_detections), np.array(unmatched_trackers)
 
 
 class Sort(object):
+
+    # initialize sort with several parameters
     def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3):
         """
     Sets key parameters for SORT
     """
-        self.max_age = max_age
-        self.min_hits = min_hits
-        self.iou_threshold = iou_threshold
-        self.trackers = []
-        self.frame_count = 0
+        self.max_age = max_age # maximum number of frames a tracklet can remain unmatched before being detected
+        self.min_hits = min_hits # minimum number of hits (detections) requred to create a tracklet
+        self.iou_threshold = iou_threshold # minimum IoU required for an object
+        self.trackers = [] # list that stores instancers of the KalmanBoxTracker class
+        self.frame_count = 0 # keeps track of the number of frames processed
 
+    # update function is called once for each frame of the video
     def update(self, dets, scores):
         """
     Params:
@@ -231,13 +254,17 @@ class Sort(object):
     Returns the a similar array, where the last column is the object ID.
     NOTE: The number of objects returned may differ from the number of detections provided.
     """
+        # check if dets is none, create empty numpy array if so
         if dets is None:
             dets = np.empty((0, 5))
+        # if dets is not none, we will append the corresponding score to each detection in dets
         else:
             for i, score in enumerate(scores):
                 dets[i] = np.append(dets[i], score)
             dets = np.array(dets)
+        # increments frame_count variable
         self.frame_count += 1
+
         # get predicted locations from existing trackers.
         trks = np.zeros((len(self.trackers), 5))
         to_del = []
