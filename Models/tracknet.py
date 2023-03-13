@@ -1,6 +1,8 @@
 from keras.models import *
 from keras.layers import *
 
+# defines a deep neural network for image segmentation that can be trained on a dataset of labeled images to segment and label new images
+
 def trackNet( n_classes ,  input_height, input_width ): # input_height = 360, input_width = 640
 
 	imgs_input = Input(shape=(3,input_height,input_width))
