@@ -266,7 +266,9 @@ class Sort(object):
         self.frame_count += 1
 
         # get predicted locations from existing trackers.
-        trks = np.zeros((len(self.trackers), 5))
+        trks = np.zeros((len(self.trackers), 5)) # stores the predicted locations as trks
+        # also check if any of the predicted locations are NaN and adds the corresponding tracker
+        # to the list `to_del`
         to_del = []
         ret = []
         for t, trk in enumerate(trks):
@@ -277,6 +279,7 @@ class Sort(object):
         trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
         for t in reversed(to_del):
             self.trackers.pop(t)
+        # associate each detection with a tracklet
         matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets, trks, self.iou_threshold)
 
         # update matched trackers with assigned detections
