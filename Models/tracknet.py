@@ -5,8 +5,11 @@ from keras.layers import *
 
 def trackNet( n_classes ,  input_height, input_width ): # input_height = 360, input_width = 640
 
-	imgs_input = Input(shape=(3,input_height,input_width))
+	# create tensor using Input() function from the keras.layers module to represent the imput image
+	imgs_input = Input(shape=(3,input_height,input_width)) 
 
+	# U-Net structure
+	# layers 1-13: contracting path (filters double, starting by 64 until reaching 512), 2 layers per 
 	#layer1
 	x = Conv2D(64, (3, 3), kernel_initializer='random_uniform', padding='same', data_format='channels_first' )(imgs_input)
 	x = ( Activation('relu'))(x)
@@ -14,9 +17,10 @@ def trackNet( n_classes ,  input_height, input_width ): # input_height = 360, in
 
 	#layer2
 	x = Conv2D(64, (3, 3), kernel_initializer='random_uniform', padding='same', data_format='channels_first' )(x)
-	x = ( Activation('relu'))(x)
+	x = ( Activation('relu'))(x) 
 	x = ( BatchNormalization())(x)
 
+	
 	#layer3
 	x = MaxPooling2D((2, 2), strides=(2, 2), data_format='channels_first' )(x)
 

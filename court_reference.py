@@ -3,24 +3,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+# here we are creating a reference model for a tennis court
 class CourtReference:
     """
     Court reference model
     """
+    # here we are initializing our court reference model
     def __init__(self):
-        self.baseline_top = ((286, 561), (1379, 561))
-        self.baseline_bottom = ((286, 2935), (1379, 2935))
-        self.net = ((286, 1748), (1379, 1748))
-        self.left_court_line = ((286, 561), (286, 2935))
-        self.right_court_line = ((1379, 561), (1379, 2935))
-        self.left_inner_line = ((423, 561), (423, 2935))
-        self.right_inner_line = ((1242, 561), (1242, 2935))
-        self.middle_line = ((832, 1110), (832, 2386))
-        self.top_inner_line = ((423, 1110), (1242, 1110))
-        self.bottom_inner_line = ((423, 2386), (1242, 2386))
+        self.baseline_top = ((286, 561), (1379, 561)) # top of baseline
+        self.baseline_bottom = ((286, 2935), (1379, 2935)) # bottom of baseline
+        self.net = ((286, 1748), (1379, 1748)) # net
+        self.left_court_line = ((286, 561), (286, 2935)) # left side furthest line
+        self.right_court_line = ((1379, 561), (1379, 2935)) # right side furthest line
+        self.left_inner_line = ((423, 561), (423, 2935)) # left singles line
+        self.right_inner_line = ((1242, 561), (1242, 2935)) # right singles line
+        self.middle_line = ((832, 1110), (832, 2386)) # middle service line
+        self.top_inner_line = ((423, 1110), (1242, 1110)) # top service line
+        self.bottom_inner_line = ((423, 2386), (1242, 2386)) # bottom service line
         self.top_extra_part = (832.5, 580)
         self.bottom_extra_part = (832.5, 2910)
 
+        # create dictionary with 12 keys, each representing a different section of a tennis court
+        # the * operator is used to unpack the values from a list into the main list
         self.court_conf = {1: [*self.baseline_top, *self.baseline_bottom],
                            2: [self.left_inner_line[0], self.right_inner_line[0], self.left_inner_line[1],
                                self.right_inner_line[1]],
@@ -50,6 +54,7 @@ class CourtReference:
 
         self.court = cv2.cvtColor(cv2.imread('court_configurations/court_reference.png'), cv2.COLOR_BGR2GRAY)
 
+    # createsw black and white image of the court reference base on the lines and points defined above
     def build_court_reference(self):
         """
         Create court reference image using the lines positions
@@ -70,6 +75,7 @@ class CourtReference:
         self.court = court
         return court
 
+    # method to return a list of all the lines on the court defined in __init__
     def get_important_lines(self):
         """
         Returns all lines of the court
@@ -79,10 +85,15 @@ class CourtReference:
                  *self.top_inner_line, *self.bottom_inner_line]
         return lines
 
+    # method to return a list of two points which define the top and bottom 'extra parts' of the code
     def get_extra_parts(self):
         parts = [self.top_extra_part, self.bottom_extra_part]
         return parts
 
+    # method to create all possible configurations of 4 points on the court reference
+    # use itertools.combinations function to create all possible combination from the 
+    # .. self.court_conf dictionary
+    # then use cv2.line function to draw lines connecting the 4 points, then save image 
     def save_all_court_configurations(self):
         """
         Create all configurations of 4 points on court reference
