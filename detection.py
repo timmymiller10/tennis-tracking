@@ -16,9 +16,12 @@ import matplotlib.pyplot as plt
 
 class DetectionModel:
     def __init__(self, dtype=torch.FloatTensor):
+        # faster r-CNN model with a ResNet-50 backbone loaded from the `torchvision.models`
+        # this model is pre-trained on the COCO dataset
         self.detection_model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
-        self.detection_model.type(dtype)  # Also moves model to GPU if available
-        self.detection_model.eval()
+        self.detection_model.type(dtype)  #set type to dtype, Also moves model to GPU if available
+        self.detection_model.eval() # put model in 'evaluation mode' 
+        # define class attributes
         self.dtype = dtype
         self.PERSON_LABEL = 1
         self.RACKET_LABEL = 43
@@ -42,6 +45,7 @@ class DetectionModel:
         self.movement_threshold = 200
         self.mot_tracker = Sort(max_age=10, min_hits=3, iou_threshold=0.05)
 
+    # method to detect bottom player; takes in image frame and court_detector object
     def detect_player_1(self, image, court_detector):
         """
         Detecting bottom player
@@ -49,11 +53,13 @@ class DetectionModel:
         boxes = np.zeros_like(image)
 
         self.v_height, self.v_width = image.shape[:2]
+        
         # Check if player has been detected before
         if len(self.player_1_boxes) == 0:
             if court_detector is None:
                 image_court = image.copy()
             else:
+                # if not, it detects all persons in the ROI (region of interest) defined by the court_detector object
                 # ROI is bottom half of the court
                 court_type = 1
                 white_ref = court_detector.court_reference.get_court_mask(court_type)
